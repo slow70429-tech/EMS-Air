@@ -18,6 +18,7 @@
       <button class="nav-item" data-view="pairings">小孔配對</button>
       <button class="nav-item" data-view="calibrations">小孔校正</button>
       <button class="nav-item" data-view="repairs">維修管理</button>
+      <button class="nav-item admin-only" data-view="admin">管理中心</button>
     </nav>
     <div class="sidebar-footer"><span class="status-dot" id="apiDot"></span><span id="apiStatus">連線檢查中</span></div>
   </aside>
@@ -69,21 +70,67 @@
       </section>
 
       <section id="view-pairings" class="view">
-        <div class="panel pairing-form admin-only">
-          <div class="panel-header"><div><h3>快速配對</h3><p>全部使用下拉選單，不需手動輸入</p></div></div>
-          <div class="form-grid">
-            <label>小孔<select id="pairOrifice" class="select-input"></select></label>
-            <label>配對類型<select id="pairTargetType" class="select-input"><option value="空品車">空品車</option><option value="高量採集器">高量採集器</option><option value="倉庫">歸還倉庫</option></select></label>
-            <label id="pairTargetWrap">配對對象<select id="pairTarget" class="select-input"></select></label>
-            <label>用途<select id="pairPurpose" class="select-input"><option>一般使用</option><option>高量校正</option><option>空品車校正</option><option>其他</option></select></label>
+        <div class="dashboard-grid">
+          <div class="panel admin-only">
+            <div class="panel-header"><div><h3>固定小孔設定</h3><p>每台空品車原則上都有一台固定小孔</p></div></div>
+            <div class="form-grid">
+              <label>空品車<select id="fixedCar" class="select-input"></select></label>
+              <label>固定小孔<select id="fixedOrifice" class="select-input"></select></label>
+              <label>備註<input id="fixedNote" placeholder="例如：正式配置"></label>
+            </div>
+            <button class="primary-button" id="saveFixedButton">儲存固定配置</button>
           </div>
-          <button class="primary-button" id="savePairingButton">儲存配對</button>
+
+          <div class="panel admin-only">
+            <div class="panel-header"><div><h3>臨時替換</h3><p>固定小孔送校、維修或故障時使用</p></div></div>
+            <div class="form-grid">
+              <label>空品車<select id="tempCar" class="select-input"></select></label>
+              <label>替代小孔<select id="tempOrifice" class="select-input"></select></label>
+              <label>替換原因<select id="tempReason" class="select-input"><option>送校</option><option>維修</option><option>故障</option><option>其他</option></select></label>
+              <label>預計歸還<input id="tempReturnDate" type="date"></label>
+            </div>
+            <div class="button-row">
+              <button class="primary-button" id="saveTemporaryButton">啟用替代</button>
+              <button class="secondary-button" id="restoreFixedButton">恢復固定小孔</button>
+            </div>
+          </div>
         </div>
-        <div class="panel"><div class="panel-header"><div><h3>目前配對</h3><p>小孔可在空品車與高量採集器間互通</p></div></div><div id="pairingGrid" class="entity-grid compact"></div></div>
+
+        <div class="panel" style="margin-top:18px">
+          <div class="panel-header"><div><h3>空品車小孔配置</h3><p>固定小孔與目前使用小孔分開記錄</p></div></div>
+          <div id="carOrificeGrid" class="entity-grid"></div>
+        </div>
       </section>
 
       <section id="view-calibrations" class="view"><div class="table-wrap"><table><thead><tr><th>小孔</th><th>報告編號</th><th>校正日期</th><th>到期日</th><th>斜率</th><th>截距</th><th>相關係數</th><th>保存形式</th></tr></thead><tbody id="calibrationTableBody"></tbody></table></div></section>
       <section id="view-repairs" class="view"><div class="table-wrap"><table><thead><tr><th>對象</th><th>所屬空品車</th><th>儀器</th><th>故障內容</th><th>送修日期</th><th>狀態</th><th>登記者</th></tr></thead><tbody id="repairTableBody"></tbody></table></div></section>
+
+      <section id="view-admin" class="view">
+        <div class="admin-menu-grid">
+          <article class="admin-tile" data-admin-go="instruments"><span>📦</span><h3>儀器管理</h3><p>新增、修改、停用及恢復</p></article>
+          <article class="admin-tile" data-admin-go="pairings"><span>⭕</span><h3>小孔配置</h3><p>固定配置、臨時替換與恢復</p></article>
+          <article class="admin-tile" id="openPeoplePanel"><span>👥</span><h3>人員權限</h3><p>管理角色與啟用狀態</p></article>
+          <article class="admin-tile" id="openLogsPanel"><span>📋</span><h3>操作紀錄</h3><p>查詢誰在何時修改了什麼</p></article>
+          <article class="admin-tile" id="openTasksPanel"><span>🔔</span><h3>今日待辦</h3><p>校正到期、送修過久與替代使用</p></article>
+          <article class="admin-tile" id="openSettingsPanel"><span>⚙️</span><h3>系統設定</h3><p>管理者限定設定</p></article>
+        </div>
+
+        <div class="panel admin-panel-block" id="peoplePanel">
+          <div class="panel-header"><div><h3>人員與權限</h3><p>最高管理員、管理員、一般人員、訪客</p></div><button class="primary-button" id="addPersonButton">＋ 新增人員</button></div>
+          <div class="table-wrap flat"><table><thead><tr><th>姓名</th><th>權限</th><th>狀態</th><th>最後更新</th><th>管理</th></tr></thead><tbody id="peopleTableBody"></tbody></table></div>
+        </div>
+
+        <div class="panel admin-panel-block" id="tasksPanel">
+          <div class="panel-header"><div><h3>今日需要處理</h3><p>開啟系統後優先查看</p></div></div>
+          <div id="taskList" class="task-list"></div>
+        </div>
+
+        <div class="panel admin-panel-block" id="logsPanel">
+          <div class="panel-header"><div><h3>操作紀錄</h3><p>所有重要寫入動作保留追溯</p></div></div>
+          <div class="table-wrap flat"><table><thead><tr><th>時間</th><th>操作者</th><th>動作</th><th>對象</th><th>內容</th></tr></thead><tbody id="logsTableBody"></tbody></table></div>
+        </div>
+      </section>
+
     </section>
   </main>
 </div>
@@ -103,6 +150,21 @@
         <label>狀態<select name="狀態"><option>可使用</option><option>校正中</option><option>維修</option><option>故障</option><option>停用</option></select></label>
       </div>
       <div class="modal-actions"><button type="button" class="secondary-button" data-close-modal>取消</button><button type="submit" class="primary-button">新增</button></div>
+    </form>
+  </div>
+</div>
+
+
+<div class="modal hidden" id="personModal">
+  <div class="modal-card small-modal">
+    <div class="modal-header"><h3>新增人員</h3><button class="icon-button" data-close-person>×</button></div>
+    <form id="personForm">
+      <div class="form-grid two-col">
+        <label>姓名<input name="姓名" required></label>
+        <label>權限<select name="權限"><option>管理員</option><option>一般人員</option><option>訪客</option></select></label>
+        <label>狀態<select name="狀態"><option>啟用</option><option>停用</option></select></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="secondary-button" data-close-person>取消</button><button type="submit" class="primary-button">新增</button></div>
     </form>
   </div>
 </div>
