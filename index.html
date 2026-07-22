@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f2740">
+  <title>EMS-Air｜空氣儀器管理</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><div class="brand-mark">EA</div><div><h1>EMS-Air</h1><p>空氣儀器管理系統</p></div></div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard">總覽</button>
+        <button class="nav-item" data-view="cars">空品車</button>
+        <button class="nav-item" data-view="instruments">儀器清單</button>
+        <button class="nav-item" data-view="pairings">目前配對</button>
+        <button class="nav-item" data-view="calibrations">小孔校正</button>
+        <button class="nav-item" data-view="repairs">維修管理</button>
+      </nav>
+      <div class="sidebar-footer"><span class="status-dot" id="apiDot"></span><span id="apiStatus">連線檢查中</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="menu-button" id="menuButton" aria-label="開啟選單">☰</button>
+        <div><h2 id="pageTitle">系統總覽</h2><p id="pageSubtitle">即時讀取 EMS-Air Google 試算表</p></div>
+        <div class="topbar-actions"><button class="secondary-button" id="refreshButton">重新整理</button><div class="user-badge"><strong>良澤</strong><span>最高管理員</span></div></div>
+      </header>
+
+      <section class="content">
+        <div class="notice"><strong>V1 讀取版</strong><span>目前已完成即時讀取。配對、維修及更新資料的寫入功能將在下一版接上。</span></div>
+        <div id="loading" class="loading">正在讀取資料庫…</div>
+        <div id="errorBox" class="error-box hidden"></div>
+
+        <section id="view-dashboard" class="view active">
+          <div class="metric-grid">
+            <article class="metric-card"><span>空品車</span><strong id="metricCars">—</strong><small>總數</small></article>
+            <article class="metric-card"><span>儀器</span><strong id="metricInstruments">—</strong><small>一般儀器</small></article>
+            <article class="metric-card"><span>小孔使用中</span><strong id="metricPairings">—</strong><small>目前配對</small></article>
+            <article class="metric-card"><span>維修中</span><strong id="metricRepairs">—</strong><small>未結案</small></article>
+          </div>
+          <div class="dashboard-grid">
+            <article class="panel"><div class="panel-header"><div><h3>目前小孔位置</h3><p>共用小孔即時狀態</p></div><button class="text-button" data-go="pairings">查看全部</button></div><div id="dashboardPairings" class="card-list"></div></article>
+            <article class="panel"><div class="panel-header"><div><h3>空品車狀態</h3><p>A6～A12</p></div><button class="text-button" data-go="cars">查看全部</button></div><div id="dashboardCars" class="card-list"></div></article>
+          </div>
+        </section>
+
+        <section id="view-cars" class="view"><div class="section-toolbar"><input id="carSearch" class="search-input" placeholder="搜尋車號、操作者或小孔"></div><div id="carsGrid" class="entity-grid"></div></section>
+
+        <section id="view-instruments" class="view">
+          <div class="section-toolbar"><input id="instrumentSearch" class="search-input" placeholder="搜尋編號、類別、品牌、型號或序號"><select id="instrumentCategory" class="select-input"><option value="">全部類別</option></select></div>
+          <div class="table-wrap"><table><thead><tr><th>編號</th><th>類別</th><th>名稱</th><th>品牌／型號</th><th>序號</th><th>狀態</th><th>最後更新者</th></tr></thead><tbody id="instrumentTableBody"></tbody></table></div>
+        </section>
+
+        <section id="view-pairings" class="view"><div class="panel"><div class="panel-header"><div><h3>目前配對</h3><p>小孔不固定綁定，可在空品車與高量採樣器間互通</p></div></div><div id="pairingGrid" class="entity-grid compact"></div></div></section>
+
+        <section id="view-calibrations" class="view"><div class="table-wrap"><table><thead><tr><th>小孔</th><th>報告編號</th><th>校正日期</th><th>到期日</th><th>斜率</th><th>截距</th><th>相關係數</th><th>保存形式</th></tr></thead><tbody id="calibrationTableBody"></tbody></table></div></section>
+
+        <section id="view-repairs" class="view"><div class="table-wrap"><table><thead><tr><th>對象</th><th>所屬空品車</th><th>儀器</th><th>故障內容</th><th>送修日期</th><th>狀態</th><th>登記者</th></tr></thead><tbody id="repairTableBody"></tbody></table></div></section>
+      </section>
+    </main>
+  </div>
+  <script>window.EMS_CONFIG={API_URL:"https://script.google.com/macros/s/AKfycbywGCRYVmM_eTJXlkV_bn7GQT3RtQzktgVesyePt27rnWMhfSTkqWNgYXbNICeSsyJY/exec"};</script>
+  <script src="js/app.js"></script>
+</body>
+</html>
