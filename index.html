@@ -47,6 +47,11 @@
           <article class="metric-card"><span>流量計</span><strong id="metricFlow">—</strong><small>主要設備</small></article>
           <article class="metric-card alert"><span>待處理</span><strong id="metricIssues">—</strong><small>維修／故障／待確認</small></article>
         </div>
+        <article class="panel search-panel">
+          <div class="panel-header"><div><h3>快速查詢</h3><p>輸入高量、流量計、小孔或風速計編號</p></div></div>
+          <div class="global-search-row"><input id="globalSearch" class="search-input" placeholder="例如：P5、FU5、M、B7"><button id="globalSearchButton" class="primary-button">查詢</button></div>
+          <div id="searchResult" class="search-results"><div class="empty">輸入 P5、FU5、M、B7 等編號即可查詢</div></div>
+        </article>
         <div class="dashboard-grid">
           <article class="panel"><div class="panel-header"><div><h3>空品車維修狀態</h3><p>優先確認是否能正常出車</p></div><button class="text-button" data-go="cars">查看全部</button></div><div id="dashboardCars" class="card-list"></div></article>
           <article class="panel"><div class="panel-header"><div><h3>目前小孔配對</h3><p>P2～P6 與 FU 固定，小孔可變更</p></div><button class="text-button" data-go="pairings">管理配對</button></div><div id="dashboardPairings" class="card-list"></div></article>

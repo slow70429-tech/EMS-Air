@@ -17,7 +17,20 @@ function savePairings(){localStorage.setItem(PAIRING_KEY,JSON.stringify(state.pa
 function normalizeStatus(s){s=String(s||"").trim();if(!s)return"尚未確認";if(/停用|封存/.test(s))return"尚未確認";return s}
 function pill(s){s=normalizeStatus(s);const c=/故障|不可使用|送修|過期/.test(s)?"danger":/校正|維修|部分|待|尚未/.test(s)?"warn":/可使用|正常/.test(s)?"":"neutral";return`<span class="status-pill ${c}">${escapeHtml(s)}</span>`}
 function categoryOf(x){const raw=[value(x,["類別"]),value(x,["名稱"]),value(x,["編號"])].join(" ");if(/高量|採集器|^P\d+/i.test(raw))return"高量採集器";if(/風速|風向|氣象/.test(raw)||knownWind.includes(value(x,["編號"])))return"風速計";if(/流量|浮子/.test(raw)||/^FU/i.test(value(x,["編號"])))return"流量計";if(/小孔|孔口/.test(raw))return"小孔";return"其他"}
-async function get(action){const r=await fetch(`${API}?action=${encodeURIComponent(action)}&_=${Date.now()}`);const j=await r.json();if(!j.success)throw new Error(j.message||"讀取失敗");return j.data||[]}
+async function get(action){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),12000);
+  try{
+    const r=await fetch(`${API}?action=${encodeURIComponent(action)}&_=${Date.now()}`,{signal:controller.signal,cache:"no-store"});
+    if(!r.ok)throw new Error(`API HTTP ${r.status}`);
+    const j=await r.json();
+    if(!j.success)throw new Error(j.message||`${action} 讀取失敗`);
+    return j.data||[];
+  }catch(err){
+    if(err.name==="AbortError")throw new Error(`${action} 讀取逾時`);
+    throw err;
+  }finally{clearTimeout(timer)}
+}
 async function post(action,payload){const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action,adminToken:ADMIN_TOKEN,payload})});const j=await r.json();if(!j.success)throw new Error(j.message||"寫入失敗");return j.data}
 function flash(msg,type="success"){const box=$(type==="success"?"#successBox":"#errorBox");box.textContent=msg;box.classList.remove("hidden");setTimeout(()=>box.classList.add("hidden"),4000)}
 function instrumentByCode(code){return state.instruments.find(x=>String(value(x,["編號"])).toUpperCase()===code.toUpperCase())}
@@ -28,18 +41,48 @@ function allForCategory(cat){
   const ids=cat==="高量採集器"?knownHV:cat==="風速計"?knownWind:cat==="流量計"?knownFlow:[];
   const map=new Map(found.map(x=>[String(value(x,["編號"])).toUpperCase(),x]));
   ids.forEach(id=>{if(!map.has(id.toUpperCase()))map.set(id.toUpperCase(),{編號:id,狀態:"尚未確認",備註:"資料待補"})});
-  return [...map.values()].sort((a,b)=>String(value(a,["編號"])).localeCompare(String(value(b,["編號"]),"zh-Hant",{numeric:true}));
+  return [...map.values()].sort((a,b)=>
+    String(value(a,["編號"])).localeCompare(String(value(b,["編號"])),"zh-Hant",{numeric:true})
+  );
 }
 function unresolvedRepairs(){return state.repairs.filter(x=>!/已取回|維修完成|取消|結案/.test(value(x,["狀態"])))}
 async function loadAll(){
   $("#loading").classList.remove("hidden");
-  try{
-    const [instruments,cars,repairs]=await Promise.all([get("instruments"),get("cars"),get("repairs")]);
-    Object.assign(state,{instruments,cars,repairs});
-    $("#apiDot").className="status-dot online";$("#apiStatus").textContent="API 已連線";renderAll();
-  }catch(e){$("#apiDot").className="status-dot offline";$("#apiStatus").textContent="API 連線失敗";flash(e.message,"error");renderAll()}
-  finally{$("#loading").classList.add("hidden")}
+  $("#errorBox").classList.add("hidden");
+  const results=await Promise.allSettled([get("instruments"),get("cars"),get("repairs")]);
+  const keys=["instruments","cars","repairs"];
+  const failures=[];
+  results.forEach((result,index)=>{
+    if(result.status==="fulfilled")state[keys[index]]=result.value;
+    else failures.push(`${keys[index]}：${result.reason?.message||"讀取失敗"}`);
+  });
+  if(failures.length===0){
+    $("#apiDot").className="status-dot online";
+    $("#apiStatus").textContent="API 已連線";
+  }else{
+    $("#apiDot").className="status-dot offline";
+    $("#apiStatus").textContent=failures.length===3?"API 連線失敗":"部分資料未連線";
+    flash(`目前先顯示預設架構。${failures.join("；")}`,"error");
+  }
+  renderAll();
+  $("#loading").classList.add("hidden");
 }
+
+function runGlobalSearch(){
+  const q=$("#globalSearch")?.value.trim().toUpperCase();
+  const box=$("#searchResult");
+  if(!box)return;
+  if(!q){box.innerHTML='<div class="empty">輸入 P5、FU5、M、B7 等編號即可查詢</div>';return}
+  const results=[];
+  const pair=fixedPairs.find(p=>p.hv===q||p.flow===q||String(state.pairings.current[p.hv]||"").toUpperCase()===q.replace(/台$/,""));
+  if(pair){
+    results.push(`<article class="search-result-card"><strong>${pair.hv}</strong><span>固定流量計：${pair.flow}</span><span>目前小孔：${escapeHtml(state.pairings.current[pair.hv]||"待補")}台</span><span>狀態：${normalizeStatus(statusOfCode(pair.hv))}</span></article>`);
+  }
+  const inst=state.instruments.filter(x=>String(value(x,["編號"])).toUpperCase().includes(q));
+  inst.forEach(x=>results.push(`<article class="search-result-card"><strong>${escapeHtml(value(x,["編號"]))}</strong><span>${escapeHtml(categoryOf(x))}</span><span>狀態：${escapeHtml(normalizeStatus(value(x,["狀態"])))}</span><span>備註：${escapeHtml(noteOf(x))}</span></article>`));
+  box.innerHTML=results.length?results.join(""):'<div class="empty">找不到符合的資料</div>';
+}
+
 function renderAll(){
   const hv=allForCategory("高量採集器"),wind=allForCategory("風速計"),flow=allForCategory("流量計");
   $("#metricCars").textContent=state.cars.length||7;$("#metricHV").textContent=hv.length;$("#metricWind").textContent=wind.length;$("#metricFlow").textContent=flow.length;
@@ -89,7 +132,7 @@ window.openStatusModal=openStatusModal;
 function closeStatusModal(){$("#statusModal").classList.add("hidden")}
 function switchView(name){$$('.view').forEach(v=>v.classList.remove('active'));$$('.nav-item').forEach(v=>v.classList.remove('active'));$(`#view-${name}`).classList.add('active');$(`.nav-item[data-view="${name}"]`)?.classList.add('active');const titles={dashboard:["系統總覽","空品車維修、小孔配對與主要儀器狀態"],cars:["空品車","車況、維修項目與最後確認"],pairings:["小孔配對","P2～P6 固定 FU，只變更小孔"],highvolume:["高量採集器","小車與空品車高量採集器狀態"],wind:["風速計","可使用、校正、維修、故障與待確認"],flow:["流量計","固定對應與儀器狀態"],repairs:["維修紀錄","空品車及主要儀器維修資料"]};$("#pageTitle").textContent=titles[name][0];$("#pageSubtitle").textContent=titles[name][1];$("#sidebar").classList.remove("open")}
 $$('.nav-item').forEach(b=>b.onclick=()=>switchView(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>switchView(b.dataset.go));
-$("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");$("#refreshButton").onclick=loadAll;$("#carSearch").oninput=renderCars;
+$("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");$("#refreshButton").onclick=loadAll;$("#carSearch").oninput=renderCars;$("#globalSearchButton").onclick=runGlobalSearch;$("#globalSearch").onkeydown=e=>{if(e.key==="Enter")runGlobalSearch()};
 $$('.instrument-search,.status-filter').forEach(el=>el.oninput=el.onchange=()=>{const cat=el.dataset.category;renderInstrumentCategory(cat,cat==="高量採集器"?"#highvolumeGrid":cat==="風速計"?"#windGrid":"#flowGrid")});
 $("#pairHV").onchange=updatePairForm;$("#savePairingButton").onclick=()=>{const hv=$("#pairHV").value,p=fixedPairs.find(x=>x.hv===hv),next=$("#pairOrifice").value,old=state.pairings.current[hv]||"";state.pairings.current[hv]=next;state.pairings.history.push({at:new Date().toLocaleString("zh-TW",{hour12:false}),hv,flow:p.flow,old,new:next,by:$("#pairBy").value.trim()});savePairings();flash(`${hv} 已配對 ${next}台`);renderAll()};
 $("#closeStatusModal").onclick=$("#cancelStatusModal").onclick=closeStatusModal;
