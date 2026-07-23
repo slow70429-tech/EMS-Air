@@ -1,29 +1,23 @@
-# EMS-Air Web V1
+# EMS-Air 核心架構版
 
-第一版網站會直接讀取既有 Google Apps Script API。
+此版本以現有 Google Apps Script API 為基礎，首頁優先顯示：
 
-## 已完成
-- API 連線狀態
-- Dashboard 統計
-- 空品車資料
-- 儀器清單與搜尋
-- 目前小孔配對
-- 小孔校正紀錄
-- 維修紀錄
-- 手機與電腦自適應介面
+- 空品車維修狀態
+- 小孔配對
+- 高量採集器狀態
+- 風速計狀態
+- 流量計狀態
 
-## 目前限制
-這版是「讀取版」。Apps Script 目前只有 GET API，因此尚不能從網站修改試算表。
+已移除「外借」狀態。大氣壓力計、溫度計暫不放主要畫面。
 
-下一版會加入：
-- 登入與四級權限
-- 更新空品車操作者
-- 小孔快速配對／解除
-- 維修新增與結案
-- 自動寫入最後更新者及操作紀錄
+## 更新方式
 
-## GitHub 上傳
-把本資料夾內所有檔案與資料夾上傳到 EMS-Air repository 根目錄。
+1. 解壓縮本 ZIP。
+2. 將 `index.html`、`css`、`js`、`README.md` 複製到電腦的 `EMS-Air` 資料夾。
+3. 選擇取代目的地中的檔案。
+4. 回到 GitHub Desktop。
+5. Summary 輸入 `EMS-Air 核心架構更新`。
+6. 按 `Commit to main`。
+7. 再按 `Push origin`。
 
-## GitHub Pages
-Settings → Pages → Deploy from a branch → main / root → Save
+小孔配對歷史目前儲存在各瀏覽器的 localStorage。下一階段可再寫入 Google 試算表。

@@ -1,105 +1,97 @@
 const API=window.EMS_CONFIG.API_URL;
-const ROLE=window.EMS_CONFIG.ROLE||"guest";
 const ADMIN_TOKEN=window.EMS_CONFIG.ADMIN_TOKEN||"";
 const CURRENT_USER="良澤";
-const state={instruments:[],cars:[],pairings:[],fixedConfigs:[],calibrations:[],repairs:[],people:[],logs:[],category:"全部"};
+const PAIRING_KEY="emsAirHvOrificePairingV4";
+const state={instruments:[],cars:[],repairs:[],pairings:loadPairings()};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const isAdmin=()=>ROLE==="admin";
+const fixedPairs=[
+  {hv:"P2",flow:"FU2",orifice:"K"},{hv:"P3",flow:"FU3",orifice:"A"},{hv:"P4",flow:"FU4",orifice:"A"},{hv:"P5",flow:"FU5",orifice:"M"},{hv:"P6",flow:"FU6",orifice:"C"}
+];
+const knownWind=["B7","B8","B9","B10","B11"];
+const knownFlow=["FU2","FU3","FU4","FU5","FU6","FU24","FU26","FU27","FU29","FU30","FU31","FU32","FU33"];
+const knownHV=["P2","P3","P4","P5","P6","P23","P24","P26","P27","P28","P29","P30"];
 function escapeHtml(v=""){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function value(o,ks){for(const k of ks)if(o&&o[k]!==undefined&&o[k]!=="")return o[k];return""}
-function normCat(raw){const s=String(raw||"").trim();if(/空品車|監測車/.test(s))return"空品車";if(/小孔|孔口/.test(s))return"小孔";if(/高量|採集器|^P\d+/i.test(s))return"高量採集器";if(/流量計|浮子|氣體流量/.test(s))return"流量計";if(/PM.?10/i.test(s))return"PM10";return"其他儀器"}
-function pill(s){s=s||"未設定";const c=/送修|故障|停用|過期/.test(s)?"danger":/校正|保養|部分|待|替代/.test(s)?"warn":/可使用|使用中|正常|啟用/.test(s)?"":"neutral";return`<span class="status-pill ${c}">${escapeHtml(s)}</span>`}
+function loadPairings(){try{const saved=JSON.parse(localStorage.getItem(PAIRING_KEY)||"null");if(saved?.current)return saved}catch{}return{current:Object.fromEntries(fixedPairs.map(x=>[x.hv,x.orifice])),history:[]}}
+function savePairings(){localStorage.setItem(PAIRING_KEY,JSON.stringify(state.pairings))}
+function normalizeStatus(s){s=String(s||"").trim();if(!s)return"尚未確認";if(/停用|封存/.test(s))return"尚未確認";return s}
+function pill(s){s=normalizeStatus(s);const c=/故障|不可使用|送修|過期/.test(s)?"danger":/校正|維修|部分|待|尚未/.test(s)?"warn":/可使用|正常/.test(s)?"":"neutral";return`<span class="status-pill ${c}">${escapeHtml(s)}</span>`}
+function categoryOf(x){const raw=[value(x,["類別"]),value(x,["名稱"]),value(x,["編號"])].join(" ");if(/高量|採集器|^P\d+/i.test(raw))return"高量採集器";if(/風速|風向|氣象/.test(raw)||knownWind.includes(value(x,["編號"])))return"風速計";if(/流量|浮子/.test(raw)||/^FU/i.test(value(x,["編號"])))return"流量計";if(/小孔|孔口/.test(raw))return"小孔";return"其他"}
 async function get(action){const r=await fetch(`${API}?action=${encodeURIComponent(action)}&_=${Date.now()}`);const j=await r.json();if(!j.success)throw new Error(j.message||"讀取失敗");return j.data||[]}
 async function post(action,payload){const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action,adminToken:ADMIN_TOKEN,payload})});const j=await r.json();if(!j.success)throw new Error(j.message||"寫入失敗");return j.data}
 function flash(msg,type="success"){const box=$(type==="success"?"#successBox":"#errorBox");box.textContent=msg;box.classList.remove("hidden");setTimeout(()=>box.classList.add("hidden"),4000)}
+function instrumentByCode(code){return state.instruments.find(x=>String(value(x,["編號"])).toUpperCase()===code.toUpperCase())}
+function statusOfCode(code){return normalizeStatus(value(instrumentByCode(code),["狀態"]))}
+function noteOf(x){return value(x,["備註","故障內容","說明"])||"—"}
+function allForCategory(cat){
+  const found=state.instruments.filter(x=>categoryOf(x)===cat);
+  const ids=cat==="高量採集器"?knownHV:cat==="風速計"?knownWind:cat==="流量計"?knownFlow:[];
+  const map=new Map(found.map(x=>[String(value(x,["編號"])).toUpperCase(),x]));
+  ids.forEach(id=>{if(!map.has(id.toUpperCase()))map.set(id.toUpperCase(),{編號:id,狀態:"尚未確認",備註:"資料待補"})});
+  return [...map.values()].sort((a,b)=>String(value(a,["編號"])).localeCompare(String(value(b,["編號"]),"zh-Hant",{numeric:true}));
+}
+function unresolvedRepairs(){return state.repairs.filter(x=>!/已取回|維修完成|取消|結案/.test(value(x,["狀態"])))}
 async function loadAll(){
- $("#loading").classList.remove("hidden");
- try{
-   const [ping,instruments,cars,pairings,fixedConfigs,calibrations,repairs,people,logs]=await Promise.all([
-     get("ping"),get("instruments"),get("cars"),get("currentPairings"),get("fixedOrificeConfigs"),get("orificeCalibrations"),get("repairs"),get("people"),get("logs")
-   ]);
-   Object.assign(state,{instruments,cars,pairings,fixedConfigs,calibrations,repairs,people,logs});
-   $("#apiDot").className="status-dot online";$("#apiStatus").textContent="API 已連線";renderAll();
- }catch(e){$("#apiDot").className="status-dot offline";$("#apiStatus").textContent="API 連線失敗";flash(e.message,"error")}
- finally{$("#loading").classList.add("hidden")}
+  $("#loading").classList.remove("hidden");
+  try{
+    const [instruments,cars,repairs]=await Promise.all([get("instruments"),get("cars"),get("repairs")]);
+    Object.assign(state,{instruments,cars,repairs});
+    $("#apiDot").className="status-dot online";$("#apiStatus").textContent="API 已連線";renderAll();
+  }catch(e){$("#apiDot").className="status-dot offline";$("#apiStatus").textContent="API 連線失敗";flash(e.message,"error");renderAll()}
+  finally{$("#loading").classList.add("hidden")}
 }
-function getOrifices(){return state.instruments.filter(x=>normCat(value(x,["類別","名稱","編號"]))==="小孔"&&value(x,["狀態"])!=="停用")}
 function renderAll(){
- const active=state.instruments.filter(x=>value(x,["狀態"])!=="停用");
- $("#metricCars").textContent=state.cars.length;
- $("#metricOrifices").textContent=active.filter(x=>normCat(value(x,["類別","名稱","編號"]))==="小孔").length;
- $("#metricHighVolume").textContent=active.filter(x=>normCat(value(x,["類別","名稱","編號"]))==="高量採集器").length;
- $("#metricRepairs").textContent=state.repairs.filter(x=>!/已取回|維修完成|取消/.test(value(x,["狀態"]))).length;
- renderDashboard();renderCars();renderCategoryTabs();renderInstruments();renderPairingControls();renderCarOrificeGrid();renderCalibrations();renderRepairs();renderPeople();renderLogs();renderTasks();
+  const hv=allForCategory("高量採集器"),wind=allForCategory("風速計"),flow=allForCategory("流量計");
+  $("#metricCars").textContent=state.cars.length||7;$("#metricHV").textContent=hv.length;$("#metricWind").textContent=wind.length;$("#metricFlow").textContent=flow.length;
+  const issueCount=[...hv,...wind,...flow].filter(x=>!/可使用|正常/.test(normalizeStatus(value(x,["狀態"])))).length+unresolvedRepairs().length;
+  $("#metricIssues").textContent=issueCount;
+  renderDashboard();renderCars();renderPairings();renderInstrumentCategory("高量採集器","#highvolumeGrid");renderInstrumentCategory("風速計","#windGrid");renderInstrumentCategory("流量計","#flowGrid");renderRepairs();
 }
-function carConfig(carNo){
- const fixed=state.fixedConfigs.find(x=>value(x,["車號"])===carNo)||{};
- const pairing=state.pairings.find(x=>value(x,["對象類型"])==="空品車"&&value(x,["對象編號"])===carNo)||{};
- return {fixed:value(fixed,["固定小孔"]),current:value(pairing,["小孔編號"])||value(fixed,["固定小孔"]),reason:value(pairing,["替換原因","用途"]),expected:value(pairing,["預計歸還"]),isTemporary:!!value(pairing,["小孔編號"])&&value(pairing,["小孔編號"])!==value(fixed,["固定小孔"])};
+function carStatus(car){
+  const no=value(car,["車號"]),direct=normalizeStatus(value(car,["車輛狀態"]));
+  const repairs=unresolvedRepairs().filter(r=>value(r,["所屬空品車"])===no||value(r,["對象編號"])===no);
+  if(/不可使用|故障/.test(direct))return"不可使用";
+  if(repairs.length||/維修|部分/.test(direct))return"部分設備維修";
+  if(/可使用|正常/.test(direct))return"正常可使用";
+  return"尚未確認";
 }
 function renderDashboard(){
- $("#dashboardPairings").innerHTML=state.cars.slice(0,7).map(c=>{const no=value(c,["車號"]),cfg=carConfig(no);return`<div class="list-row"><div><strong>${escapeHtml(no)}</strong><br><span>固定 ${escapeHtml(cfg.fixed||"未設定")}｜目前 ${escapeHtml(cfg.current||"未設定")}</span></div>${pill(cfg.isTemporary?"替代使用中":"正常配置")}</div>`}).join("")||'<div class="empty">尚無資料</div>';
- $("#dashboardCars").innerHTML=state.cars.map(x=>`<div class="list-row"><div><strong>${escapeHtml(value(x,["車號"]))}</strong><br><span>${escapeHtml(value(x,["目前操作者"])||"尚未指定")}</span></div>${pill(value(x,["車輛狀態"]))}</div>`).join("")||'<div class="empty">尚無空品車資料</div>';
+  const cars=(state.cars.length?state.cars:["A6","A7","A8","A9","A10","A11","A12"].map(車號=>({車號}))).slice(0,7);
+  $("#dashboardCars").innerHTML=cars.map(c=>`<div class="list-row"><div><strong>${escapeHtml(value(c,["車號"]))}</strong><br><span>${escapeHtml(value(c,["目前操作者"])||"尚未指定")}</span></div>${pill(carStatus(c))}</div>`).join("");
+  $("#dashboardPairings").innerHTML=fixedPairs.map(p=>`<div class="list-row"><div><strong>${p.hv}</strong><br><span>${p.flow}（固定）｜${escapeHtml(state.pairings.current[p.hv]||"待補")}台</span></div>${pill(statusOfCode(p.hv))}</div>`).join("");
+  const issues=[];
+  ["高量採集器","風速計","流量計"].forEach(cat=>allForCategory(cat).forEach(x=>{const st=normalizeStatus(value(x,["狀態"]));if(!/可使用|正常/.test(st))issues.push({code:value(x,["編號"]),cat,st,note:noteOf(x)})}));
+  unresolvedRepairs().forEach(x=>issues.push({code:value(x,["儀器ID/編號","儀器項目","對象編號"]),cat:"維修紀錄",st:value(x,["狀態"])||"維修",note:value(x,["故障內容"])||"—"}));
+  $("#dashboardIssues").innerHTML=issues.length?`<div class="table-wrap flat"><table><thead><tr><th>編號</th><th>類別</th><th>狀態</th><th>備註</th></tr></thead><tbody>${issues.slice(0,15).map(x=>`<tr><td><strong>${escapeHtml(x.code)}</strong></td><td>${escapeHtml(x.cat)}</td><td>${pill(x.st)}</td><td>${escapeHtml(x.note)}</td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">目前沒有待處理項目</div>';
 }
 function renderCars(){
- const q=$("#carSearch").value.trim().toLowerCase();
- const rows=state.cars.filter(x=>JSON.stringify(x).toLowerCase().includes(q));
- $("#carsGrid").innerHTML=rows.map(x=>{const no=value(x,["車號"]),cfg=carConfig(no);return`<article class="entity-card"><div style="display:flex;justify-content:space-between;gap:12px"><div><h3>${escapeHtml(no)} 車</h3><div class="sub">空氣品質監測車</div></div>${pill(value(x,["車輛狀態"]))}</div><dl><dt>目前操作者</dt><dd>${escapeHtml(value(x,["目前操作者"])||"尚未指定")}</dd><dt>固定小孔</dt><dd>${escapeHtml(cfg.fixed||"未設定")}</dd><dt>目前使用</dt><dd>${escapeHtml(cfg.current||"未設定")}</dd><dt>配置狀態</dt><dd>${cfg.isTemporary?pill("替代使用中"):pill("正常配置")}</dd></dl></article>`}).join("")||'<div class="empty">沒有符合的空品車</div>';
+  const q=$("#carSearch").value.trim().toLowerCase();
+  const defaults={A6:"鐘",A7:"吳",A8:"聰",A9:"強",A10:"儀",A11:"許",A12:"閔"};
+  const cars=state.cars.length?state.cars:Object.keys(defaults).map(車號=>({車號,目前操作者:defaults[車號]}));
+  $("#carsGrid").innerHTML=cars.filter(x=>JSON.stringify(x).toLowerCase().includes(q)).map(x=>{const no=value(x,["車號"]),repairs=unresolvedRepairs().filter(r=>value(r,["所屬空品車"])===no||value(r,["對象編號"])===no);return`<article class="entity-card"><div class="entity-head"><div><h3>${escapeHtml(no)}</h3><div class="sub">負責人：${escapeHtml(value(x,["目前操作者"])||defaults[no]||"待補")}</div></div>${pill(carStatus(x))}</div><dl><dt>維修項目</dt><dd>${escapeHtml(repairs.map(r=>value(r,["儀器ID/編號","儀器項目"])).filter(Boolean).join("、")||"無")}</dd><dt>維修說明</dt><dd>${escapeHtml(repairs.map(r=>value(r,["故障內容"])).filter(Boolean).join("；")||"—")}</dd><dt>最後確認</dt><dd>${escapeHtml(value(x,["最後更新時間","最後確認"])||"尚未確認")}</dd></dl></article>`}).join("")||'<div class="empty">沒有符合的空品車</div>';
 }
-function renderCategoryTabs(){
- const cats=["全部","小孔","流量計","高量採集器","PM10","其他儀器"];
- $("#categoryTabs").innerHTML=cats.map(c=>`<button class="category-tab ${state.category===c?"active":""}" data-category="${c}">${c} (${c==="全部"?state.instruments.length:state.instruments.filter(x=>normCat(value(x,["類別","名稱","編號"]))===c).length})</button>`).join("");
- $$("[data-category]").forEach(b=>b.onclick=()=>{state.category=b.dataset.category;renderCategoryTabs();renderInstruments()});
+function renderPairings(){
+  $("#pairHV").innerHTML=fixedPairs.map(x=>`<option value="${x.hv}">${x.hv}</option>`).join("");
+  const orifices=["A","B","C","D","E","F","I","J","K","L","M","N"];
+  $("#pairOrifice").innerHTML=orifices.map(x=>`<option value="${x}">${x}台</option>`).join("");updatePairForm();
+  $("#pairingGrid").innerHTML=fixedPairs.map(p=>`<article class="entity-card"><div class="entity-head"><div><h3>${p.hv}</h3><div class="sub">小車高量</div></div>${pill(statusOfCode(p.hv))}</div><dl><dt>固定 FU</dt><dd>${p.flow}</dd><dt>目前小孔</dt><dd>${escapeHtml(state.pairings.current[p.hv]||"待補")}台</dd></dl></article>`).join("");
+  $("#pairingHistoryBody").innerHTML=state.pairings.history.slice().reverse().map(h=>`<tr><td>${escapeHtml(h.at)}</td><td>${h.hv}</td><td>${h.flow}</td><td>${escapeHtml(h.old||"—")}</td><td>${escapeHtml(h.new)}</td><td>${escapeHtml(h.by||"—")}</td></tr>`).join("")||'<tr><td colspan="6" class="empty">尚無配對異動紀錄</td></tr>';
 }
-function renderInstruments(){
- const q=$("#instrumentSearch").value.trim().toLowerCase(),status=$("#instrumentStatus").value;
- const rows=state.instruments.filter(x=>(state.category==="全部"||normCat(value(x,["類別","名稱","編號"]))===state.category)&&(!status||value(x,["狀態"])===status)&&JSON.stringify(x).toLowerCase().includes(q));
- $("#instrumentTableBody").innerHTML=rows.map(x=>{const code=value(x,["編號"]);return`<tr><td><strong>${escapeHtml(code)}</strong></td><td>${escapeHtml(normCat(value(x,["類別","名稱","編號"])))}</td><td>${escapeHtml(value(x,["名稱"]))}</td><td>${escapeHtml([value(x,["品牌"]),value(x,["型號"])].filter(Boolean).join(" / "))}</td><td>${escapeHtml(value(x,["序號"]))}</td><td>${escapeHtml(value(x,["目前位置"])||"倉庫")}</td><td>${pill(value(x,["狀態"]))}</td><td class="admin-only"><div class="admin-action"><button class="secondary-button" onclick="editStatus('${escapeHtml(code)}')">狀態</button><button class="danger-button" onclick="archiveInstrument('${escapeHtml(code)}')">停用</button></div></td></tr>`}).join("")||'<tr><td colspan="8" class="empty">沒有符合的儀器</td></tr>';
+function updatePairForm(){const p=fixedPairs.find(x=>x.hv===$("#pairHV").value)||fixedPairs[0];$("#pairFlow").value=p.flow;$("#pairOrifice").value=state.pairings.current[p.hv]||p.orifice}
+function renderInstrumentCategory(cat,target){
+  const search=$(`.instrument-search[data-category="${cat}"]`)?.value.trim().toLowerCase()||"";const status=$(`.status-filter[data-category="${cat}"]`)?.value||"";
+  const rows=allForCategory(cat).filter(x=>(!status||normalizeStatus(value(x,["狀態"]))===status)&&JSON.stringify(x).toLowerCase().includes(search));
+  $(target).innerHTML=rows.map(x=>{const code=value(x,["編號"]),fixed=cat==="流量計"?fixedPairs.find(p=>p.flow===code)?.hv:"";const pairing=cat==="高量採集器"?fixedPairs.find(p=>p.hv===code):null;return`<article class="entity-card"><div class="entity-head"><div><h3>${escapeHtml(code)}</h3><div class="sub">${escapeHtml(cat)}</div></div>${pill(value(x,["狀態"]))}</div><dl>${pairing?`<dt>固定流量計</dt><dd>${pairing.flow}</dd><dt>目前小孔</dt><dd>${escapeHtml(state.pairings.current[code]||"待補")}台</dd>`:""}${fixed?`<dt>固定對應</dt><dd>${fixed}</dd>`:""}<dt>目前位置</dt><dd>${escapeHtml(value(x,["目前位置"])||"待補")}</dd><dt>備註</dt><dd>${escapeHtml(noteOf(x))}</dd></dl><button class="secondary-button small-button" onclick="openStatusModal('${escapeHtml(code)}')">更新狀態</button></article>`}).join("")||'<div class="empty">沒有符合的儀器</div>';
 }
-function renderPairingControls(){
- const carOpts=state.cars.map(x=>`<option value="${escapeHtml(value(x,["車號"]))}">${escapeHtml(value(x,["車號"]))}</option>`).join("");
- $("#fixedCar").innerHTML=carOpts;$("#tempCar").innerHTML=carOpts;
- const oriOpts=getOrifices().map(x=>`<option value="${escapeHtml(value(x,["編號"]))}">${escapeHtml(value(x,["編號"]))}</option>`).join("");
- $("#fixedOrifice").innerHTML=oriOpts;$("#tempOrifice").innerHTML=oriOpts;
-}
-function renderCarOrificeGrid(){
- $("#carOrificeGrid").innerHTML=state.cars.map(c=>{const no=value(c,["車號"]),cfg=carConfig(no);return`<article class="entity-card"><div style="display:flex;justify-content:space-between;gap:12px"><div><h3>${escapeHtml(no)}</h3><div class="sub">小孔配置</div></div>${pill(cfg.isTemporary?"替代使用中":"正常配置")}</div><dl><dt>固定小孔</dt><dd>${escapeHtml(cfg.fixed||"未設定")}</dd><dt>目前使用</dt><dd>${escapeHtml(cfg.current||"未設定")}</dd><dt>替換原因</dt><dd>${escapeHtml(cfg.isTemporary?(cfg.reason||"未填寫"):"—")}</dd><dt>預計歸還</dt><dd>${escapeHtml(cfg.expected||"—")}</dd></dl></article>`}).join("")||'<div class="empty">尚無空品車資料</div>';
-}
-function renderCalibrations(){$("#calibrationTableBody").innerHTML=state.calibrations.map(x=>`<tr><td><strong>${escapeHtml(value(x,["小孔編號"]))}</strong></td><td>${escapeHtml(value(x,["報告編號"]))}</td><td>${escapeHtml(value(x,["校正日期"]))}</td><td>${escapeHtml(value(x,["到期日"]))}</td><td>${escapeHtml(value(x,["斜率(m³/min)"]))}</td><td>${escapeHtml(value(x,["截距(m³/min)"]))}</td><td>${escapeHtml(value(x,["相關係數(m³/min)"]))}</td><td>${escapeHtml(value(x,["保存形式"])||"紙本")}</td></tr>`).join("")||'<tr><td colspan="8" class="empty">尚無小孔校正資料</td></tr>'}
 function renderRepairs(){$("#repairTableBody").innerHTML=state.repairs.map(x=>`<tr><td>${escapeHtml(value(x,["對象類型"]))}</td><td>${escapeHtml(value(x,["所屬空品車"])||"—")}</td><td><strong>${escapeHtml(value(x,["儀器ID/編號","儀器項目"]))}</strong></td><td>${escapeHtml(value(x,["故障內容"]))}</td><td>${escapeHtml(value(x,["送修日期"]))}</td><td>${pill(value(x,["狀態"]))}</td><td>${escapeHtml(value(x,["登記者"])||"—")}</td></tr>`).join("")||'<tr><td colspan="7" class="empty">目前沒有維修紀錄</td></tr>'}
-function renderPeople(){
- $("#peopleTableBody").innerHTML=state.people.map(x=>`<tr><td><strong>${escapeHtml(value(x,["姓名"]))}</strong></td><td>${escapeHtml(value(x,["權限"]))}</td><td>${pill(value(x,["狀態"]))}</td><td>${escapeHtml(value(x,["最後更新時間"])||"—")}</td><td><button class="secondary-button" onclick="togglePerson('${escapeHtml(value(x,["姓名"]))}','${escapeHtml(value(x,["狀態"]))}')">${value(x,["狀態"])==="停用"?"啟用":"停用"}</button></td></tr>`).join("")||'<tr><td colspan="5" class="empty">尚未建立人員資料</td></tr>';
-}
-function renderLogs(){
- $("#logsTableBody").innerHTML=state.logs.slice().reverse().slice(0,100).map(x=>`<tr><td>${escapeHtml(value(x,["時間"]))}</td><td>${escapeHtml(value(x,["操作者"]))}</td><td>${escapeHtml(value(x,["動作"]))}</td><td>${escapeHtml(value(x,["對象"]))}</td><td class="sub">${escapeHtml(value(x,["內容"]))}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">尚無操作紀錄</td></tr>';
-}
-function renderTasks(){
- const tasks=[];
- state.cars.forEach(c=>{const no=value(c,["車號"]),cfg=carConfig(no);if(cfg.isTemporary)tasks.push({level:"info",title:`${no} 正在使用替代小孔 ${cfg.current}`,detail:`固定小孔 ${cfg.fixed}；原因：${cfg.reason||"未填寫"}`})});
- state.repairs.filter(x=>!/已取回|維修完成|取消/.test(value(x,["狀態"]))).forEach(x=>tasks.push({level:"danger",title:`${value(x,["儀器ID/編號","儀器項目"])} 維修尚未結案`,detail:value(x,["故障內容"])||"請確認維修進度"}));
- const today=new Date(),limit=new Date(today);limit.setDate(limit.getDate()+30);
- state.calibrations.forEach(x=>{const d=new Date(value(x,["到期日"]));if(!isNaN(d)&&d<=limit)tasks.push({level:d<today?"danger":"",title:`${value(x,["小孔編號"])} 校正${d<today?"已過期":"即將到期"}`,detail:`到期日：${value(x,["到期日"])}`})});
- $("#taskList").innerHTML=tasks.map(t=>`<div class="task-item"><div><strong>${escapeHtml(t.title)}</strong><span>${escapeHtml(t.detail)}</span></div><div class="task-level ${t.level}">${t.level==="danger"?"需處理":t.level==="info"?"替代中":"提醒"}</div></div>`).join("")||'<div class="empty">目前沒有需要立即處理的事項</div>';
-}
-async function archiveInstrument(code){if(!confirm(`確定將 ${code} 設為停用？歷史紀錄會保留。`))return;try{await post("archiveInstrument",{編號:code,最後更新者:CURRENT_USER});flash(`${code} 已停用`);await loadAll()}catch(e){flash(e.message,"error")}}
-async function editStatus(code){const status=prompt(`${code} 新狀態：可使用／校正中／維修／故障／停用`);if(!status)return;try{await post("updateInstrument",{編號:code,狀態:status,最後更新者:CURRENT_USER});flash(`${code} 狀態已更新`);await loadAll()}catch(e){flash(e.message,"error")}}
-async function togglePerson(name,status){const newStatus=status==="停用"?"啟用":"停用";if(!confirm(`確定將 ${name} 設為${newStatus}？`))return;try{await post("updatePerson",{姓名:name,狀態:newStatus,最後更新者:CURRENT_USER});flash(`${name} 已${newStatus}`);await loadAll()}catch(e){flash(e.message,"error")}}
-window.archiveInstrument=archiveInstrument;window.editStatus=editStatus;window.togglePerson=togglePerson;
-function switchView(name){
- $$(".view").forEach(v=>v.classList.remove("active"));$$(".nav-item").forEach(v=>v.classList.remove("active"));
- $(`#view-${name}`).classList.add("active");$(`.nav-item[data-view="${name}"]`)?.classList.add("active");
- const t={dashboard:["系統總覽","即時讀取 EMS-Air Google 試算表"],cars:["空品車","操作者、固定小孔與目前使用小孔"],instruments:["儀器管理","分類、新增、停用與狀態管理"],pairings:["小孔配置","固定配置、臨時替換與恢復"],calibrations:["小孔校正","紙本報告關鍵資料"],repairs:["維修管理","空品車及各項儀器維修紀錄"],admin:["管理中心","管理員限定功能與追溯紀錄"]};
- $("#pageTitle").textContent=t[name][0];$("#pageSubtitle").textContent=t[name][1];$("#sidebar").classList.remove("open");
-}
-$$(".nav-item").forEach(b=>b.onclick=()=>switchView(b.dataset.view));$$("[data-go]").forEach(b=>b.onclick=()=>switchView(b.dataset.go));$$("[data-admin-go]").forEach(b=>b.onclick=()=>switchView(b.dataset.adminGo));
-$("#refreshButton").onclick=loadAll;$("#instrumentSearch").oninput=renderInstruments;$("#instrumentStatus").onchange=renderInstruments;$("#carSearch").oninput=renderCars;$("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");
-$("#addInstrumentButton").onclick=()=>$("#instrumentModal").classList.remove("hidden");$$("[data-close-modal]").forEach(b=>b.onclick=()=>$("#instrumentModal").classList.add("hidden"));
-$("#addPersonButton").onclick=()=>$("#personModal").classList.remove("hidden");$$("[data-close-person]").forEach(b=>b.onclick=()=>$("#personModal").classList.add("hidden"));
-$("#instrumentForm").onsubmit=async e=>{e.preventDefault();const p=Object.fromEntries(new FormData(e.target).entries());p.目前位置=p.目前位置||"倉庫";p.最後更新者=CURRENT_USER;try{await post("addInstrument",p);$("#instrumentModal").classList.add("hidden");e.target.reset();flash(`${p.編號} 已新增`);await loadAll()}catch(err){flash(err.message,"error")}};
-$("#personForm").onsubmit=async e=>{e.preventDefault();const p=Object.fromEntries(new FormData(e.target).entries());p.最後更新者=CURRENT_USER;try{await post("addPerson",p);$("#personModal").classList.add("hidden");e.target.reset();flash(`${p.姓名} 已新增`);await loadAll()}catch(err){flash(err.message,"error")}};
-$("#saveFixedButton").onclick=async()=>{const p={車號:$("#fixedCar").value,固定小孔:$("#fixedOrifice").value,備註:$("#fixedNote").value,最後更新者:CURRENT_USER};try{await post("saveFixedOrifice",p);flash(`${p.車號} 固定小孔已設為 ${p.固定小孔}`);await loadAll()}catch(e){flash(e.message,"error")}};
-$("#saveTemporaryButton").onclick=async()=>{const p={車號:$("#tempCar").value,替代小孔:$("#tempOrifice").value,替換原因:$("#tempReason").value,預計歸還:$("#tempReturnDate").value,最後更新者:CURRENT_USER};try{await post("startTemporaryOrifice",p);flash(`${p.車號} 已改用 ${p.替代小孔}`);await loadAll()}catch(e){flash(e.message,"error")}};
-$("#restoreFixedButton").onclick=async()=>{const p={車號:$("#tempCar").value,最後更新者:CURRENT_USER};if(!confirm(`確定讓 ${p.車號} 恢復固定小孔？`))return;try{await post("restoreFixedOrifice",p);flash(`${p.車號} 已恢復固定小孔`);await loadAll()}catch(e){flash(e.message,"error")}};
-if(!isAdmin())$$(".admin-only").forEach(el=>el.classList.add("hidden"));
-$("#roleLabel").textContent=isAdmin()?"最高管理員":"唯讀使用者";
+function openStatusModal(code){const x=instrumentByCode(code);$("#statusCode").value=code;$("#statusModalTitle").textContent=`更新 ${code} 狀態`;$("#statusValue").value=normalizeStatus(value(x,["狀態"]));$("#statusNote").value=value(x,["備註"]);$("#statusModal").classList.remove("hidden")}
+window.openStatusModal=openStatusModal;
+function closeStatusModal(){$("#statusModal").classList.add("hidden")}
+function switchView(name){$$('.view').forEach(v=>v.classList.remove('active'));$$('.nav-item').forEach(v=>v.classList.remove('active'));$(`#view-${name}`).classList.add('active');$(`.nav-item[data-view="${name}"]`)?.classList.add('active');const titles={dashboard:["系統總覽","空品車維修、小孔配對與主要儀器狀態"],cars:["空品車","車況、維修項目與最後確認"],pairings:["小孔配對","P2～P6 固定 FU，只變更小孔"],highvolume:["高量採集器","小車與空品車高量採集器狀態"],wind:["風速計","可使用、校正、維修、故障與待確認"],flow:["流量計","固定對應與儀器狀態"],repairs:["維修紀錄","空品車及主要儀器維修資料"]};$("#pageTitle").textContent=titles[name][0];$("#pageSubtitle").textContent=titles[name][1];$("#sidebar").classList.remove("open")}
+$$('.nav-item').forEach(b=>b.onclick=()=>switchView(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>switchView(b.dataset.go));
+$("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");$("#refreshButton").onclick=loadAll;$("#carSearch").oninput=renderCars;
+$$('.instrument-search,.status-filter').forEach(el=>el.oninput=el.onchange=()=>{const cat=el.dataset.category;renderInstrumentCategory(cat,cat==="高量採集器"?"#highvolumeGrid":cat==="風速計"?"#windGrid":"#flowGrid")});
+$("#pairHV").onchange=updatePairForm;$("#savePairingButton").onclick=()=>{const hv=$("#pairHV").value,p=fixedPairs.find(x=>x.hv===hv),next=$("#pairOrifice").value,old=state.pairings.current[hv]||"";state.pairings.current[hv]=next;state.pairings.history.push({at:new Date().toLocaleString("zh-TW",{hour12:false}),hv,flow:p.flow,old,new:next,by:$("#pairBy").value.trim()});savePairings();flash(`${hv} 已配對 ${next}台`);renderAll()};
+$("#closeStatusModal").onclick=$("#cancelStatusModal").onclick=closeStatusModal;
+$("#statusForm").onsubmit=async e=>{e.preventDefault();const code=$("#statusCode").value,status=$("#statusValue").value,note=$("#statusNote").value.trim();try{await post("updateInstrument",{編號:code,狀態:status,備註:note,最後更新者:CURRENT_USER});flash(`${code} 狀態已更新`);closeStatusModal();await loadAll()}catch(err){flash(err.message,"error")}};
 loadAll();
