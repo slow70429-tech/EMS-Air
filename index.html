@@ -1,181 +1,595 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0f2740">
-  <title>EMS-Air｜空氣儀器管理</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b6b5b" />
+  <title>EMS-Air V4</title>
+  <style>
+    :root{
+      --bg:#eef4f2;
+      --surface:#ffffff;
+      --surface-2:#f7faf9;
+      --text:#15342f;
+      --muted:#6d827d;
+      --line:#dce8e4;
+      --primary:#0b6b5b;
+      --primary-2:#0e806d;
+      --green:#15803d;
+      --yellow:#ca8a04;
+      --orange:#d97706;
+      --red:#dc2626;
+      --gray:#64748b;
+      --shadow:0 10px 30px rgba(14,61,52,.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+      color:var(--text);
+      background:linear-gradient(180deg,#e7f1ee 0,#f5f8f7 260px,var(--bg) 100%);
+    }
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .app{min-height:100vh}
+    .topbar{
+      position:sticky; top:0; z-index:20;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px; padding:14px 18px;
+      background:rgba(255,255,255,.92);
+      backdrop-filter:blur(16px);
+      border-bottom:1px solid rgba(220,232,228,.8);
+    }
+    .brand{display:flex;align-items:center;gap:11px}
+    .logo{
+      width:42px;height:42px;border-radius:13px;
+      background:linear-gradient(135deg,var(--primary),#19a184);
+      color:#fff;display:grid;place-items:center;font-weight:800;
+      box-shadow:0 8px 18px rgba(11,107,91,.22)
+    }
+    .brand h1{font-size:18px;margin:0}
+    .brand p{font-size:12px;color:var(--muted);margin:2px 0 0}
+    .top-actions{display:flex;gap:8px}
+    .btn{
+      border:0;border-radius:12px;padding:10px 14px;font-weight:700;
+      background:#e6f2ef;color:var(--primary)
+    }
+    .btn.primary{background:var(--primary);color:#fff}
+    .btn.danger{background:#fee2e2;color:#b91c1c}
+    .btn.ghost{background:transparent;border:1px solid var(--line)}
+    .layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100vh - 71px)}
+    .sidebar{
+      padding:20px 14px;border-right:1px solid var(--line);
+      background:rgba(255,255,255,.58)
+    }
+    .nav{display:grid;gap:7px;position:sticky;top:92px}
+    .nav button{
+      width:100%;text-align:left;border:0;border-radius:13px;
+      background:transparent;padding:12px 13px;color:#45625c;font-weight:700
+    }
+    .nav button.active{background:var(--primary);color:#fff;box-shadow:0 8px 20px rgba(11,107,91,.18)}
+    .content{padding:24px;max-width:1500px;width:100%;margin:auto}
+    .page{display:none}
+    .page.active{display:block}
+    .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:20px}
+    .page-head h2{margin:0;font-size:27px}
+    .page-head p{margin:6px 0 0;color:var(--muted)}
+    .summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:18px}
+    .summary-card{
+      background:var(--surface);border:1px solid rgba(220,232,228,.9);
+      border-radius:var(--radius);padding:17px;box-shadow:var(--shadow)
+    }
+    .summary-card .label{color:var(--muted);font-size:13px}
+    .summary-card .value{font-size:30px;font-weight:850;margin-top:5px}
+    .summary-card .sub{font-size:12px;color:var(--muted);margin-top:4px}
+    .panel-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+    .panel{
+      background:var(--surface);border:1px solid rgba(220,232,228,.9);
+      border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden
+    }
+    .panel-head{padding:17px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .panel-head h3{margin:0;font-size:17px}
+    .panel-body{padding:16px 18px}
+    .status-list{display:grid;gap:10px}
+    .status-row{
+      display:grid;grid-template-columns:72px 1fr auto;align-items:center;gap:12px;
+      padding:12px 13px;border-radius:14px;background:var(--surface-2);border:1px solid #edf3f1
+    }
+    .status-row strong{font-size:16px}
+    .status-row .detail{font-size:13px;color:var(--muted)}
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;
+      font-weight:800;font-size:12px;white-space:nowrap
+    }
+    .badge::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+    .ok{color:var(--green);background:#dcfce7}
+    .cal{color:var(--yellow);background:#fef9c3}
+    .repair{color:var(--orange);background:#ffedd5}
+    .broken{color:var(--red);background:#fee2e2}
+    .unknown{color:var(--gray);background:#e2e8f0}
+    .partial{color:var(--yellow);background:#fef3c7}
+    .table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse;min-width:720px}
+    th,td{padding:13px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+    th{font-size:12px;text-transform:none;color:var(--muted);background:#fafcfb;position:sticky;top:0}
+    tr:hover td{background:#fbfdfc}
+    .link-btn{border:0;background:transparent;color:var(--primary);font-weight:800;padding:4px}
+    .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+    .entity-card{
+      background:var(--surface);border:1px solid var(--line);border-radius:17px;
+      padding:16px;box-shadow:var(--shadow)
+    }
+    .entity-card .entity-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .entity-card h3{margin:0;font-size:20px}
+    .entity-card .meta{color:var(--muted);font-size:13px;margin-top:4px}
+    .kv{display:grid;grid-template-columns:92px 1fr;gap:9px 12px;margin-top:14px;font-size:14px}
+    .kv .k{color:var(--muted)}
+    .card-actions{display:flex;gap:8px;margin-top:15px}
+    .card-actions .btn{flex:1;padding:9px}
+    .toolbar{
+      display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:15px
+    }
+    .toolbar input,.toolbar select{
+      border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 12px;color:var(--text)
+    }
+    .toolbar input{min-width:210px;flex:1}
+    .modal{
+      position:fixed;inset:0;background:rgba(2,20,17,.46);display:none;
+      align-items:center;justify-content:center;padding:18px;z-index:100
+    }
+    .modal.show{display:flex}
+    .modal-card{
+      width:min(620px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;
+      box-shadow:0 28px 80px rgba(0,0,0,.25)
+    }
+    .modal-head{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid var(--line)}
+    .modal-head h3{margin:0}
+    .close{border:0;background:#eef4f2;width:36px;height:36px;border-radius:10px;font-size:20px}
+    .form{padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .field{display:grid;gap:7px}
+    .field.full{grid-column:1/-1}
+    label{font-size:13px;font-weight:800;color:#46625d}
+    input,select,textarea{
+      width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff
+    }
+    textarea{min-height:92px;resize:vertical}
+    .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 20px;border-top:1px solid var(--line)}
+    .empty{padding:34px;text-align:center;color:var(--muted)}
+    .note{
+      border:1px dashed #b8d1cb;background:#f2f8f6;border-radius:14px;padding:12px 14px;color:#527069;font-size:13px
+    }
+    .footer-note{margin-top:18px;color:var(--muted);font-size:12px;text-align:center}
+    @media (max-width:1100px){
+      .summary-grid{grid-template-columns:repeat(3,1fr)}
+      .cards{grid-template-columns:repeat(2,1fr)}
+      .panel-grid{grid-template-columns:1fr}
+    }
+    @media (max-width:760px){
+      .layout{grid-template-columns:1fr}
+      .sidebar{
+        position:sticky;top:71px;z-index:15;padding:9px 10px;border-right:0;border-bottom:1px solid var(--line);
+        overflow:auto;background:rgba(255,255,255,.95);backdrop-filter:blur(12px)
+      }
+      .nav{display:flex;gap:7px;position:static;width:max-content}
+      .nav button{width:auto;white-space:nowrap;padding:10px 12px}
+      .content{padding:16px 12px 28px}
+      .page-head{align-items:flex-start;flex-direction:column}
+      .page-head h2{font-size:23px}
+      .summary-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+      .summary-card{padding:14px}
+      .summary-card .value{font-size:26px}
+      .cards{grid-template-columns:1fr}
+      .top-actions .btn.ghost{display:none}
+      .form{grid-template-columns:1fr}
+      .field.full{grid-column:auto}
+      .panel-head,.panel-body{padding-left:14px;padding-right:14px}
+    }
+  </style>
 </head>
 <body>
-<div class="app-shell">
-  <aside class="sidebar" id="sidebar">
-    <div class="brand"><div class="brand-mark">EA</div><div><h1>EMS-Air</h1><p>空氣儀器管理系統</p></div></div>
-    <nav class="nav">
-      <button class="nav-item active" data-view="dashboard">總覽</button>
-      <button class="nav-item" data-view="cars">空品車</button>
-      <button class="nav-item" data-view="instruments">儀器管理</button>
-      <button class="nav-item" data-view="pairings">小孔配對</button>
-      <button class="nav-item" data-view="calibrations">小孔校正</button>
-      <button class="nav-item" data-view="repairs">維修管理</button>
-      <button class="nav-item admin-only" data-view="admin">管理中心</button>
-    </nav>
-    <div class="sidebar-footer"><span class="status-dot" id="apiDot"></span><span id="apiStatus">連線檢查中</span></div>
-  </aside>
-
-  <main class="main">
-    <header class="topbar">
-      <button class="menu-button" id="menuButton" aria-label="開啟選單">☰</button>
-      <div><h2 id="pageTitle">系統總覽</h2><p id="pageSubtitle">即時讀取 EMS-Air Google 試算表</p></div>
-      <div class="topbar-actions">
-        <button class="secondary-button" id="refreshButton">重新整理</button>
-        <div class="user-badge"><strong>良澤</strong><span id="roleLabel">最高管理員</span></div>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">EA</div>
+      <div>
+        <h1>EMS-Air V4</h1>
+        <p>空氣監測儀器管理</p>
       </div>
-    </header>
+    </div>
+    <div class="top-actions">
+      <button class="btn ghost" onclick="exportData()">匯出備份</button>
+      <button class="btn primary" onclick="openQuickConfirm()">＋ 快速確認</button>
+    </div>
+  </header>
 
-    <section class="content">
-      <div class="notice"><strong>V2 管理版</strong><span>儀器已分類；管理者可新增、停用及配對。移除採「停用／封存」，避免歷史紀錄消失。</span></div>
-      <div id="loading" class="loading">正在讀取資料庫…</div>
-      <div id="errorBox" class="error-box hidden"></div>
-      <div id="successBox" class="success-box hidden"></div>
+  <div class="layout">
+    <aside class="sidebar">
+      <nav class="nav">
+        <button class="active" data-page="dashboard">總覽</button>
+        <button data-page="vehicles">空品車</button>
+        <button data-page="orifices">小孔配對</button>
+        <button data-page="hv">高量採集器</button>
+        <button data-page="wind">風速計</button>
+        <button data-page="flow">流量計</button>
+      </nav>
+    </aside>
 
-      <section id="view-dashboard" class="view active">
-        <div class="metric-grid">
-          <article class="metric-card"><span>空品車</span><strong id="metricCars">—</strong><small>總數</small></article>
-          <article class="metric-card"><span>小孔</span><strong id="metricOrifices">—</strong><small>儀器數量</small></article>
-          <article class="metric-card"><span>高量採集器</span><strong id="metricHighVolume">—</strong><small>儀器數量</small></article>
-          <article class="metric-card"><span>維修中</span><strong id="metricRepairs">—</strong><small>未結案</small></article>
-        </div>
-        <div class="dashboard-grid">
-          <article class="panel"><div class="panel-header"><div><h3>目前小孔位置</h3><p>共用小孔即時狀態</p></div><button class="text-button" data-go="pairings">查看全部</button></div><div id="dashboardPairings" class="card-list"></div></article>
-          <article class="panel"><div class="panel-header"><div><h3>空品車狀態</h3><p>操作者僅顯示於空品車</p></div><button class="text-button" data-go="cars">查看全部</button></div><div id="dashboardCars" class="card-list"></div></article>
-        </div>
-      </section>
-
-      <section id="view-cars" class="view">
-        <div class="section-toolbar"><input id="carSearch" class="search-input" placeholder="搜尋車號、操作者或小孔"></div>
-        <div id="carsGrid" class="entity-grid"></div>
-      </section>
-
-      <section id="view-instruments" class="view">
-        <div class="category-tabs" id="categoryTabs"></div>
-        <div class="section-toolbar">
-          <input id="instrumentSearch" class="search-input" placeholder="搜尋編號、品牌、型號或序號">
-          <select id="instrumentStatus" class="select-input">
-            <option value="">全部狀態</option><option>可使用</option><option>校正中</option><option>維修</option><option>故障</option><option>停用</option>
-          </select>
-          <button class="primary-button admin-only" id="addInstrumentButton">＋ 新增儀器</button>
-        </div>
-        <div class="table-wrap"><table><thead><tr><th>編號</th><th>分類</th><th>名稱</th><th>品牌／型號</th><th>序號</th><th>目前位置</th><th>狀態</th><th class="admin-only">管理</th></tr></thead><tbody id="instrumentTableBody"></tbody></table></div>
-      </section>
-
-      <section id="view-pairings" class="view">
-        <div class="dashboard-grid">
-          <div class="panel admin-only">
-            <div class="panel-header"><div><h3>固定小孔設定</h3><p>每台空品車原則上都有一台固定小孔</p></div></div>
-            <div class="form-grid">
-              <label>空品車<select id="fixedCar" class="select-input"></select></label>
-              <label>固定小孔<select id="fixedOrifice" class="select-input"></select></label>
-              <label>備註<input id="fixedNote" placeholder="例如：正式配置"></label>
-            </div>
-            <button class="primary-button" id="saveFixedButton">儲存固定配置</button>
-          </div>
-
-          <div class="panel admin-only">
-            <div class="panel-header"><div><h3>臨時替換</h3><p>固定小孔送校、維修或故障時使用</p></div></div>
-            <div class="form-grid">
-              <label>空品車<select id="tempCar" class="select-input"></select></label>
-              <label>替代小孔<select id="tempOrifice" class="select-input"></select></label>
-              <label>替換原因<select id="tempReason" class="select-input"><option>送校</option><option>維修</option><option>故障</option><option>其他</option></select></label>
-              <label>預計歸還<input id="tempReturnDate" type="date"></label>
-            </div>
-            <div class="button-row">
-              <button class="primary-button" id="saveTemporaryButton">啟用替代</button>
-              <button class="secondary-button" id="restoreFixedButton">恢復固定小孔</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel" style="margin-top:18px">
-          <div class="panel-header"><div><h3>空品車小孔配置</h3><p>固定小孔與目前使用小孔分開記錄</p></div></div>
-          <div id="carOrificeGrid" class="entity-grid"></div>
-        </div>
-      </section>
-
-      <section id="view-calibrations" class="view"><div class="table-wrap"><table><thead><tr><th>小孔</th><th>報告編號</th><th>校正日期</th><th>到期日</th><th>斜率</th><th>截距</th><th>相關係數</th><th>保存形式</th></tr></thead><tbody id="calibrationTableBody"></tbody></table></div></section>
-      <section id="view-repairs" class="view"><div class="table-wrap"><table><thead><tr><th>對象</th><th>所屬空品車</th><th>儀器</th><th>故障內容</th><th>送修日期</th><th>狀態</th><th>登記者</th></tr></thead><tbody id="repairTableBody"></tbody></table></div></section>
-
-      <section id="view-admin" class="view">
-        <div class="admin-menu-grid">
-          <article class="admin-tile" data-admin-go="instruments"><span>📦</span><h3>儀器管理</h3><p>新增、修改、停用及恢復</p></article>
-          <article class="admin-tile" data-admin-go="pairings"><span>⭕</span><h3>小孔配置</h3><p>固定配置、臨時替換與恢復</p></article>
-          <article class="admin-tile" id="openPeoplePanel"><span>👥</span><h3>人員權限</h3><p>管理角色與啟用狀態</p></article>
-          <article class="admin-tile" id="openLogsPanel"><span>📋</span><h3>操作紀錄</h3><p>查詢誰在何時修改了什麼</p></article>
-          <article class="admin-tile" id="openTasksPanel"><span>🔔</span><h3>今日待辦</h3><p>校正到期、送修過久與替代使用</p></article>
-          <article class="admin-tile" id="openSettingsPanel"><span>⚙️</span><h3>系統設定</h3><p>管理者限定設定</p></article>
-        </div>
-
-        <div class="panel admin-panel-block" id="peoplePanel">
-          <div class="panel-header"><div><h3>人員與權限</h3><p>最高管理員、管理員、一般人員、訪客</p></div><button class="primary-button" id="addPersonButton">＋ 新增人員</button></div>
-          <div class="table-wrap flat"><table><thead><tr><th>姓名</th><th>權限</th><th>狀態</th><th>最後更新</th><th>管理</th></tr></thead><tbody id="peopleTableBody"></tbody></table></div>
-        </div>
-
-        <div class="panel admin-panel-block" id="tasksPanel">
-          <div class="panel-header"><div><h3>今日需要處理</h3><p>開啟系統後優先查看</p></div></div>
-          <div id="taskList" class="task-list"></div>
-        </div>
-
-        <div class="panel admin-panel-block" id="logsPanel">
-          <div class="panel-header"><div><h3>操作紀錄</h3><p>所有重要寫入動作保留追溯</p></div></div>
-          <div class="table-wrap flat"><table><thead><tr><th>時間</th><th>操作者</th><th>動作</th><th>對象</th><th>內容</th></tr></thead><tbody id="logsTableBody"></tbody></table></div>
-        </div>
-      </section>
-
-    </section>
-  </main>
-</div>
-
-<div class="modal hidden" id="instrumentModal">
-  <div class="modal-card">
-    <div class="modal-header"><h3>新增儀器</h3><button class="icon-button" data-close-modal>×</button></div>
-    <form id="instrumentForm">
-      <div class="form-grid">
-        <label>儀器編號<input name="編號" required placeholder="例如：P15、E台"></label>
-        <label>分類<select name="類別" required><option>小孔</option><option>流量計</option><option>高量採集器</option><option>PM10</option><option>其他儀器</option></select></label>
-        <label>名稱<input name="名稱" placeholder="儀器名稱"></label>
-        <label>品牌<input name="品牌"></label>
-        <label>型號<input name="型號"></label>
-        <label>序號<input name="序號"></label>
-        <label>目前位置<input name="目前位置" placeholder="預設：倉庫"></label>
-        <label>狀態<select name="狀態"><option>可使用</option><option>校正中</option><option>維修</option><option>故障</option><option>停用</option></select></label>
-      </div>
-      <div class="modal-actions"><button type="button" class="secondary-button" data-close-modal>取消</button><button type="submit" class="primary-button">新增</button></div>
-    </form>
+    <main class="content">
+      <section id="dashboard" class="page active"></section>
+      <section id="vehicles" class="page"></section>
+      <section id="orifices" class="page"></section>
+      <section id="hv" class="page"></section>
+      <section id="wind" class="page"></section>
+      <section id="flow" class="page"></section>
+      <div class="footer-note">資料目前儲存在此瀏覽器；後續可接 Google 試算表同步。</div>
+    </main>
   </div>
 </div>
 
-
-<div class="modal hidden" id="personModal">
-  <div class="modal-card small-modal">
-    <div class="modal-header"><h3>新增人員</h3><button class="icon-button" data-close-person>×</button></div>
-    <form id="personForm">
-      <div class="form-grid two-col">
-        <label>姓名<input name="姓名" required></label>
-        <label>權限<select name="權限"><option>管理員</option><option>一般人員</option><option>訪客</option></select></label>
-        <label>狀態<select name="狀態"><option>啟用</option><option>停用</option></select></label>
-      </div>
-      <div class="modal-actions"><button type="button" class="secondary-button" data-close-person>取消</button><button type="submit" class="primary-button">新增</button></div>
-    </form>
+<div id="modal" class="modal" onclick="if(event.target===this) closeModal()">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="modalTitle">編輯</h3>
+      <button class="close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modalBody"></div>
   </div>
 </div>
 
 <script>
-window.EMS_CONFIG={
-  API_URL:"https://script.google.com/macros/s/AKfycbywGCRYVmM_eTJXlkV_bn7GQT3RtQzktgVesyePt27rnWMhfSTkqWNgYXbNICeSsyJY/exec",
-  ROLE:"admin",
-  ADMIN_TOKEN:"Slow70429"
+const STORAGE_KEY = "emsAirV4Core";
+const statusMap = {
+  usable:{label:"可使用", cls:"ok"},
+  calibration:{label:"校正中", cls:"cal"},
+  maintenance:{label:"維修", cls:"repair"},
+  broken:{label:"故障", cls:"broken"},
+  unknown:{label:"尚未確認", cls:"unknown"},
+  normal:{label:"正常可使用", cls:"ok"},
+  partial:{label:"部分設備維修", cls:"partial"},
+  unavailable:{label:"不可使用", cls:"broken"}
 };
+
+const seed = {
+  vehicles:[
+    {id:"A6",operator:"鐘",status:"normal",items:[],note:"",confirmedAt:"",confirmedBy:""},
+    {id:"A7",operator:"吳",status:"unknown",items:[],note:"",confirmedAt:"",confirmedBy:""},
+    {id:"A8",operator:"聰",status:"unknown",items:[],note:"",confirmedAt:"",confirmedBy:""},
+    {id:"A9",operator:"強",status:"unknown",items:[],note:"",confirmedAt:"",confirmedBy:""},
+    {id:"A10",operator:"儀",status:"unknown",items:[],note:"",confirmedAt:"",confirmedBy:""},
+    {id:"A11",operator:"許",status:"unknown",items:[],note:"",confirmedAt:"",confirmedBy:""},
+    {id:"A12",operator:"閔",status:"unknown",items:[],note:"",confirmedAt:"",confirmedBy:""}
+  ],
+  hv:[
+    {id:"P2",group:"小車",fixedFlow:"FU2",orifice:"K",status:"usable",note:""},
+    {id:"P3",group:"小車",fixedFlow:"FU3",orifice:"A",status:"usable",note:""},
+    {id:"P4",group:"小車",fixedFlow:"FU4",orifice:"A",status:"usable",note:""},
+    {id:"P5",group:"小車",fixedFlow:"FU5",orifice:"M",status:"usable",note:""},
+    {id:"P6",group:"小車",fixedFlow:"FU6",orifice:"C",status:"usable",note:""},
+    {id:"P23",group:"空品車",fixedFlow:"待補",orifice:"待補",status:"unknown",note:""},
+    {id:"P24",group:"空品車",fixedFlow:"待補",orifice:"待補",status:"unknown",note:""},
+    {id:"P26",group:"空品車",fixedFlow:"待補",orifice:"待補",status:"unknown",note:""},
+    {id:"P27",group:"空品車",fixedFlow:"待補",orifice:"待補",status:"unknown",note:""},
+    {id:"P28",group:"空品車",fixedFlow:"待補",orifice:"待補",status:"unknown",note:""},
+    {id:"P29",group:"空品車",fixedFlow:"待補",orifice:"待補",status:"unknown",note:""},
+    {id:"P30",group:"空品車",fixedFlow:"待補",orifice:"待補",status:"unknown",note:""}
+  ],
+  orifices:["A","B","C","D","E","F","I","J","K","L","M","N"].map(id=>({id,status:"usable",note:""})),
+  wind:["B7","B8","B9","B10","B11"].map(id=>({id,status:"unknown",calibrationDate:"",note:""})),
+  flow:["FU2","FU3","FU4","FU5","FU6","FU24","FU26","FU27","FU29","FU30","FU31","FU32","FU33"].map(id=>({
+    id,
+    status:["FU2","FU3","FU4","FU5","FU6"].includes(id)?"usable":"unknown",
+    fixedTo:id.match(/^FU[2-6]$/) ? "P"+id.replace("FU","") : "待補",
+    calibrationDate:"",
+    note:""
+  })),
+  pairingHistory:[]
+};
+
+let data = loadData();
+
+function loadData(){
+  try{
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : structuredClone(seed);
+  }catch(e){ return structuredClone(seed); }
+}
+function saveData(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  renderAll();
+}
+function nowText(){
+  const d=new Date(), pad=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function badge(status){
+  const s=statusMap[status]||statusMap.unknown;
+  return `<span class="badge ${s.cls}">${s.label}</span>`;
+}
+function countIssues(list, normalKeys=["usable"]){
+  return list.filter(x=>!normalKeys.includes(x.status)).length;
+}
+function renderAll(){
+  renderDashboard();
+  renderVehicles();
+  renderOrifices();
+  renderHV();
+  renderWind();
+  renderFlow();
+}
+
+document.querySelectorAll(".nav button").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.page).classList.add("active");
+  });
+});
+
+function renderDashboard(){
+  const vehicleIssues=countIssues(data.vehicles,["normal"]);
+  const hvIssues=countIssues(data.hv);
+  const windIssues=countIssues(data.wind);
+  const flowIssues=countIssues(data.flow);
+  const paired=data.hv.filter(x=>x.group==="小車" && x.orifice && x.orifice!=="待補").length;
+
+  const vehicleRows=data.vehicles.map(v=>`
+    <div class="status-row">
+      <strong>${v.id}</strong>
+      <div><div>${v.operator||"待補"}</div><div class="detail">${v.note||"無維修說明"}</div></div>
+      ${badge(v.status)}
+    </div>`).join("");
+
+  const pairingRows=data.hv.filter(x=>x.group==="小車").map(x=>`
+    <div class="status-row">
+      <strong>${x.id}</strong>
+      <div><div>${x.fixedFlow}（固定）</div><div class="detail">目前小孔：${x.orifice==="待補"?"待補":x.orifice+"台"}</div></div>
+      ${badge(x.status)}
+    </div>`).join("");
+
+  const abnormal=[
+    ...data.hv.filter(x=>x.status!=="usable").map(x=>({id:x.id,type:"高量",status:x.status,note:x.note})),
+    ...data.wind.filter(x=>x.status!=="usable").map(x=>({id:x.id,type:"風速計",status:x.status,note:x.note})),
+    ...data.flow.filter(x=>x.status!=="usable").map(x=>({id:x.id,type:"流量計",status:x.status,note:x.note}))
+  ].slice(0,10);
+
+  document.getElementById("dashboard").innerHTML=`
+    <div class="page-head">
+      <div><h2>儀器狀態總覽</h2><p>先看空品車維修、目前配對及主要儀器異常。</p></div>
+      <button class="btn" onclick="openQuickConfirm()">快速確認狀態</button>
+    </div>
+    <div class="summary-grid">
+      <div class="summary-card"><div class="label">空品車異常</div><div class="value">${vehicleIssues}</div><div class="sub">共 ${data.vehicles.length} 台</div></div>
+      <div class="summary-card"><div class="label">高量異常</div><div class="value">${hvIssues}</div><div class="sub">共 ${data.hv.length} 台</div></div>
+      <div class="summary-card"><div class="label">小車已配對</div><div class="value">${paired}</div><div class="sub">P2～P6</div></div>
+      <div class="summary-card"><div class="label">風速計異常</div><div class="value">${windIssues}</div><div class="sub">待確認也會計入</div></div>
+      <div class="summary-card"><div class="label">流量計異常</div><div class="value">${flowIssues}</div><div class="sub">待確認也會計入</div></div>
+    </div>
+    <div class="panel-grid">
+      <div class="panel">
+        <div class="panel-head"><h3>空品車狀態</h3><button class="link-btn" onclick="goPage('vehicles')">全部查看</button></div>
+        <div class="panel-body"><div class="status-list">${vehicleRows}</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>目前小孔配對</h3><button class="link-btn" onclick="goPage('orifices')">管理配對</button></div>
+        <div class="panel-body"><div class="status-list">${pairingRows}</div></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-head"><h3>主要儀器待處理</h3><span style="color:var(--muted);font-size:12px">不含外借狀態</span></div>
+      <div class="panel-body">
+        ${abnormal.length?`<div class="table-wrap"><table><thead><tr><th>編號</th><th>類別</th><th>狀態</th><th>備註</th></tr></thead><tbody>
+          ${abnormal.map(x=>`<tr><td><strong>${x.id}</strong></td><td>${x.type}</td><td>${badge(x.status)}</td><td>${x.note||"—"}</td></tr>`).join("")}
+        </tbody></table></div>`:`<div class="empty">目前沒有待處理項目</div>`}
+      </div>
+    </div>`;
+}
+
+function renderVehicles(){
+  document.getElementById("vehicles").innerHTML=`
+    <div class="page-head"><div><h2>空品車</h2><p>管理車況、維修項目、最後確認時間及確認人。</p></div></div>
+    <div class="cards">
+      ${data.vehicles.map(v=>`
+        <div class="entity-card">
+          <div class="entity-top"><div><h3>${v.id}</h3><div class="meta">負責人：${v.operator||"待補"}</div></div>${badge(v.status)}</div>
+          <div class="kv">
+            <div class="k">維修項目</div><div>${v.items?.length?v.items.join("、"):"無"}</div>
+            <div class="k">最後確認</div><div>${v.confirmedAt||"尚未確認"}</div>
+            <div class="k">確認人</div><div>${v.confirmedBy||"—"}</div>
+            <div class="k">說明</div><div>${v.note||"—"}</div>
+          </div>
+          <div class="card-actions"><button class="btn" onclick="editVehicle('${v.id}')">編輯車況</button></div>
+        </div>`).join("")}
+    </div>`;
+}
+
+function renderOrifices(){
+  const rows=data.hv.filter(x=>x.group==="小車");
+  const duplicateMap={};
+  rows.forEach(x=>{ if(x.orifice && x.orifice!=="待補") (duplicateMap[x.orifice]??=[]).push(x.id); });
+  const duplicateWarnings=Object.entries(duplicateMap).filter(([,ids])=>ids.length>1);
+
+  document.getElementById("orifices").innerHTML=`
+    <div class="page-head"><div><h2>小孔配對</h2><p>高量與流量計固定；校正後只變更小孔配對。</p></div><button class="btn primary" onclick="openPairing()">＋ 變更配對</button></div>
+    ${duplicateWarnings.length?`<div class="note" style="margin-bottom:14px">目前偵測到重複配對：${duplicateWarnings.map(([o,ids])=>`${o}台 → ${ids.join("、")}`).join("；")}。系統先保留你提供的資料，不會自動更改。</div>`:""}
+    <div class="panel">
+      <div class="table-wrap"><table>
+        <thead><tr><th>高量</th><th>固定流量計</th><th>目前小孔</th><th>高量狀態</th><th>操作</th></tr></thead>
+        <tbody>${rows.map(x=>`<tr>
+          <td><strong>${x.id}</strong></td><td>${x.fixedFlow}</td><td>${x.orifice==="待補"?"待補":x.orifice+"台"}</td>
+          <td>${badge(x.status)}</td><td><button class="link-btn" onclick="openPairing('${x.id}')">變更</button></td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-head"><h3>配對歷史</h3></div>
+      <div class="panel-body">
+        ${data.pairingHistory.length?`<div class="table-wrap"><table><thead><tr><th>日期時間</th><th>高量</th><th>固定 FU</th><th>原小孔</th><th>新小孔</th><th>確認人</th></tr></thead><tbody>
+        ${[...data.pairingHistory].reverse().map(h=>`<tr><td>${h.at}</td><td>${h.hv}</td><td>${h.flow}</td><td>${h.old||"—"}</td><td>${h.new}</td><td>${h.by||"—"}</td></tr>`).join("")}
+        </tbody></table></div>`:`<div class="empty">尚無配對異動紀錄</div>`}
+      </div>
+    </div>`;
+}
+
+function genericPage(key,title,desc,extraCols=[]){
+  const list=data[key];
+  return `
+    <div class="page-head"><div><h2>${title}</h2><p>${desc}</p></div></div>
+    <div class="toolbar">
+      <input id="${key}Search" placeholder="搜尋編號或備註" oninput="filterTable('${key}')">
+      <select id="${key}Filter" onchange="filterTable('${key}')">
+        <option value="">全部狀態</option>
+        <option value="usable">可使用</option>
+        <option value="calibration">校正中</option>
+        <option value="maintenance">維修</option>
+        <option value="broken">故障</option>
+        <option value="unknown">尚未確認</option>
+      </select>
+    </div>
+    <div class="panel"><div class="table-wrap"><table id="${key}Table">
+      <thead><tr><th>編號</th>${extraCols.map(x=>`<th>${x.label}</th>`).join("")}<th>狀態</th><th>備註</th><th>操作</th></tr></thead>
+      <tbody>${list.map(x=>`<tr data-status="${x.status}" data-search="${(x.id+" "+(x.note||"")).toLowerCase()}">
+        <td><strong>${x.id}</strong></td>${extraCols.map(c=>`<td>${x[c.key]||"—"}</td>`).join("")}
+        <td>${badge(x.status)}</td><td>${x.note||"—"}</td><td><button class="link-btn" onclick="editInstrument('${key}','${x.id}')">編輯</button></td>
+      </tr>`).join("")}</tbody>
+    </table></div></div>`;
+}
+function renderHV(){ document.getElementById("hv").innerHTML=genericPage("hv","高量採集器","查看小車與空品車高量採集器狀態。",[{label:"類別",key:"group"},{label:"固定流量計",key:"fixedFlow"},{label:"目前小孔",key:"orifice"}]); }
+function renderWind(){ document.getElementById("wind").innerHTML=genericPage("wind","風速計","管理可使用、校正、維修、故障與尚未確認。",[{label:"校正日期",key:"calibrationDate"}]); }
+function renderFlow(){ document.getElementById("flow").innerHTML=genericPage("flow","流量計","小車 FU 固定對應高量；其他流量計後續補齊。",[{label:"固定對應",key:"fixedTo"},{label:"校正日期",key:"calibrationDate"}]); }
+
+function filterTable(key){
+  const q=document.getElementById(key+"Search").value.toLowerCase().trim();
+  const st=document.getElementById(key+"Filter").value;
+  document.querySelectorAll(`#${key}Table tbody tr`).forEach(tr=>{
+    tr.style.display=((!q||tr.dataset.search.includes(q))&&(!st||tr.dataset.status===st))?"":"none";
+  });
+}
+function goPage(id){
+  document.querySelector(`.nav button[data-page="${id}"]`).click();
+}
+function openModal(title,body){
+  document.getElementById("modalTitle").textContent=title;
+  document.getElementById("modalBody").innerHTML=body;
+  document.getElementById("modal").classList.add("show");
+}
+function closeModal(){ document.getElementById("modal").classList.remove("show"); }
+
+function statusOptions(selected,vehicle=false){
+  const keys=vehicle?["normal","partial","unavailable","unknown"]:["usable","calibration","maintenance","broken","unknown"];
+  return keys.map(k=>`<option value="${k}" ${selected===k?"selected":""}>${statusMap[k].label}</option>`).join("");
+}
+const maintenanceItems=["PM10","高量採集器","小孔","流量計","風速計","電源","發電機","電瓶","冷氣","其他"];
+
+function editVehicle(id){
+  const v=data.vehicles.find(x=>x.id===id);
+  openModal(`編輯 ${id}`,`
+    <div class="form">
+      <div class="field"><label>負責人</label><input id="vOperator" value="${v.operator||""}"></div>
+      <div class="field"><label>車況</label><select id="vStatus">${statusOptions(v.status,true)}</select></div>
+      <div class="field full"><label>維修項目</label>
+        <div style="display:flex;flex-wrap:wrap;gap:9px">
+          ${maintenanceItems.map(item=>`<label style="display:flex;align-items:center;gap:6px;border:1px solid var(--line);padding:8px 10px;border-radius:10px">
+            <input type="checkbox" name="maintenanceItem" value="${item}" ${v.items?.includes(item)?"checked":""} style="width:auto"> ${item}
+          </label>`).join("")}
+        </div>
+      </div>
+      <div class="field"><label>確認人</label><input id="vBy" value="${v.confirmedBy||v.operator||""}"></div>
+      <div class="field"><label>最後確認</label><input id="vAt" value="${v.confirmedAt||nowText()}"></div>
+      <div class="field full"><label>維修／車況說明</label><textarea id="vNote">${v.note||""}</textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveVehicle('${id}')">儲存</button></div>`);
+}
+function saveVehicle(id){
+  const v=data.vehicles.find(x=>x.id===id);
+  v.operator=document.getElementById("vOperator").value.trim();
+  v.status=document.getElementById("vStatus").value;
+  v.items=[...document.querySelectorAll('input[name="maintenanceItem"]:checked')].map(x=>x.value);
+  v.confirmedBy=document.getElementById("vBy").value.trim();
+  v.confirmedAt=document.getElementById("vAt").value.trim();
+  v.note=document.getElementById("vNote").value.trim();
+  saveData();closeModal();
+}
+function editInstrument(key,id){
+  const x=data[key].find(i=>i.id===id);
+  const dateField=("calibrationDate" in x)?`<div class="field"><label>校正日期</label><input type="date" id="iDate" value="${x.calibrationDate||""}"></div>`:"";
+  openModal(`編輯 ${id}`,`
+    <div class="form">
+      <div class="field"><label>狀態</label><select id="iStatus">${statusOptions(x.status)}</select></div>
+      ${dateField}
+      <div class="field full"><label>備註</label><textarea id="iNote">${x.note||""}</textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveInstrument('${key}','${id}')">儲存</button></div>`);
+}
+function saveInstrument(key,id){
+  const x=data[key].find(i=>i.id===id);
+  x.status=document.getElementById("iStatus").value;
+  x.note=document.getElementById("iNote").value.trim();
+  const d=document.getElementById("iDate"); if(d) x.calibrationDate=d.value;
+  saveData();closeModal();
+}
+function openPairing(preselect=""){
+  const rows=data.hv.filter(x=>x.group==="小車");
+  openModal("變更小孔配對",`
+    <div class="form">
+      <div class="field"><label>高量採集器</label><select id="pHV" onchange="updateFixedFlow()">${rows.map(x=>`<option value="${x.id}" ${preselect===x.id?"selected":""}>${x.id}</option>`).join("")}</select></div>
+      <div class="field"><label>固定流量計</label><input id="pFlow" readonly></div>
+      <div class="field"><label>新小孔</label><select id="pOrifice">${data.orifices.map(o=>`<option value="${o.id}">${o.id}台</option>`).join("")}</select></div>
+      <div class="field"><label>確認人</label><input id="pBy" placeholder="例如：澤"></div>
+      <div class="field full"><div class="note">高量與 FU 的固定配對不會更動；只更新小孔並保留歷史。</div></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn primary" onclick="savePairing()">完成配對</button></div>`);
+  updateFixedFlow();
+}
+function updateFixedFlow(){
+  const hv=data.hv.find(x=>x.id===document.getElementById("pHV").value);
+  document.getElementById("pFlow").value=hv.fixedFlow;
+}
+function savePairing(){
+  const hv=data.hv.find(x=>x.id===document.getElementById("pHV").value);
+  const next=document.getElementById("pOrifice").value;
+  const by=document.getElementById("pBy").value.trim();
+  data.pairingHistory.push({at:nowText(),hv:hv.id,flow:hv.fixedFlow,old:hv.orifice,new:next,by});
+  hv.orifice=next;
+  saveData();closeModal();
+}
+function openQuickConfirm(){
+  openModal("快速確認",`
+    <div class="form">
+      <div class="field"><label>類別</label><select id="qType" onchange="refreshQuickIds()"><option value="vehicles">空品車</option><option value="hv">高量採集器</option><option value="wind">風速計</option><option value="flow">流量計</option></select></div>
+      <div class="field"><label>編號</label><select id="qId"></select></div>
+      <div class="field"><label>狀態</label><select id="qStatus"></select></div>
+      <div class="field"><label>確認人</label><input id="qBy"></div>
+      <div class="field full"><label>備註</label><textarea id="qNote"></textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveQuickConfirm()">確認</button></div>`);
+  refreshQuickIds();
+}
+function refreshQuickIds(){
+  const type=document.getElementById("qType").value;
+  document.getElementById("qId").innerHTML=data[type].map(x=>`<option value="${x.id}">${x.id}</option>`).join("");
+  document.getElementById("qStatus").innerHTML=statusOptions("",type==="vehicles");
+}
+function saveQuickConfirm(){
+  const type=document.getElementById("qType").value,id=document.getElementById("qId").value;
+  const x=data[type].find(i=>i.id===id);
+  x.status=document.getElementById("qStatus").value;
+  x.note=document.getElementById("qNote").value.trim();
+  if(type==="vehicles"){
+    x.confirmedBy=document.getElementById("qBy").value.trim();
+    x.confirmedAt=nowText();
+  }
+  saveData();closeModal();
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`EMS-Air-V4-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();URL.revokeObjectURL(a.href);
+}
+renderAll();
 </script>
-<script src="js/app.js"></script>
 </body>
 </html>
